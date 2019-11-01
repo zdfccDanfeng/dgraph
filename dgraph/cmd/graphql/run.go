@@ -79,6 +79,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/friendsofgo/graphiql"
 	_ "github.com/vektah/gqlparser/validator/rules" // make gql validator init() all rules
 )
 
@@ -137,7 +138,17 @@ func run() error {
 
 	mainServer, adminServer := admin.NewServers(config, introspection)
 
+	graphiqlHandler, err := graphiql.NewGraphiqlHandler("/graphql")
+	if err != nil {
+		panic(err)
+	}
+	http.Handle("/graphiql", graphiqlHandler)
 	http.Handle("/graphql", mainServer.HTTPHandler())
+	graphiqlAdminHandler, err := graphiql.NewGraphiqlHandler("/admin")
+	if err != nil {
+		panic(err)
+	}
+	http.Handle("/admin/graphiql", graphiqlAdminHandler)
 	http.Handle("/admin", adminServer.HTTPHandler())
 
 	trace.ApplyConfig(trace.Config{
@@ -156,6 +167,8 @@ func run() error {
 	addr := fmt.Sprintf("%s:%d", bind, port)
 
 	glog.Infof("Bringing up GraphQL HTTP API at %s/graphql", addr)
+	glog.Infof("Bringing up GraphiQL web interface for HTTP API at %s/graphiql", addr)
 	glog.Infof("Bringing up GraphQL HTTP admin API at %s/admin", addr)
+	glog.Infof("Bringing up GraphiQL web interface for HTTP admin API at %s/admin/graphiql", addr)
 	return errors.Wrap(http.ListenAndServe(addr, nil), "GraphQL server failed")
 }

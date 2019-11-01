@@ -22,6 +22,7 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20190423205320-6a90982ecee2
 	github.com/dgryski/go-groupvarint v0.0.0-20190318181831-5ce5df8ca4e1
 	github.com/dustin/go-humanize v1.0.0
+	github.com/friendsofgo/graphiql v0.2.2
 	github.com/go-ini/ini v1.39.0 // indirect
 	github.com/go-sql-driver/mysql v0.0.0-20190330032241-c0f6b444ad8f
 	github.com/gogo/protobuf v1.2.0
@@ -32,11 +33,7 @@ require (
 	github.com/google/codesearch v1.0.0
 	github.com/google/go-cmp v0.2.0
 	github.com/google/uuid v1.0.0
-	github.com/gorilla/context v1.1.1 // indirect
-	github.com/gorilla/mux v1.6.2 // indirect
 	github.com/minio/minio-go v0.0.0-20181109183348-774475480ffe
-	github.com/onsi/ginkgo v1.7.0 // indirect
-	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/paulmach/go.geojson v0.0.0-20170327170536-40612a87147b
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1

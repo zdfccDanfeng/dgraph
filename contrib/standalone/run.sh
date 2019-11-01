@@ -14,4 +14,4 @@ Warning: This standalone version is meant for quickstart purposes only.
          It is NOT RECOMMENDED for production environments.\033[0;0m"
 
 # TODO properly handle SIGTERM for all three processes.
-dgraph-ratel & dgraph zero & dgraph alpha --lru_mb $lru_mb
+dgraph-ratel & dgraph zero & dgraph alpha --lru_mb $lru_mb & dgraph graphql

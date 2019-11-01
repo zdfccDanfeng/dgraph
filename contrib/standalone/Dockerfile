@@ -7,7 +7,10 @@ EXPOSE 8000
 EXPOSE 8080
 # gRPC API port
 EXPOSE 9080
+# graphql port
+EXPOSE 9000
 
-ADD run.sh .
-RUN chmod +x run.sh
-CMD ["./run.sh"]
+COPY dgraph /usr/local/bin/dgraph
+ADD run.sh /tmp
+RUN chmod +x /tmp/run.sh
+CMD ["/tmp/run.sh"]
