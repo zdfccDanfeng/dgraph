@@ -50,7 +50,7 @@ type shard struct {
 	sync.RWMutex
 	block
 
-	uidMap map[string]uint64
+	uidMap map[uint64]uint64
 }
 
 type block struct {
@@ -80,7 +80,7 @@ func New(zero *grpc.ClientConn, db *badger.DB) *XidMap {
 	}
 	for i := range xm.shards {
 		xm.shards[i] = &shard{
-			uidMap: make(map[string]uint64),
+			uidMap: make(map[uint64]uint64),
 		}
 	}
 	if db != nil {
@@ -96,11 +96,11 @@ func New(zero *grpc.ClientConn, db *badger.DB) *XidMap {
 			for itr.Rewind(); itr.Valid(); itr.Next() {
 				item := itr.Item()
 				key := string(item.Key())
-				sh := xm.shardFor(key)
+				sh, fp := xm.shardFor(key)
 				err := item.Value(func(val []byte) error {
 					uid := binary.BigEndian.Uint64(val)
 					// No need to acquire a lock. This is all serial access.
-					sh.uidMap[key] = uid
+					sh.uidMap[fp] = uid
 					return nil
 				})
 				if err != nil {
@@ -141,18 +141,18 @@ func New(zero *grpc.ClientConn, db *badger.DB) *XidMap {
 	return xm
 }
 
-func (m *XidMap) shardFor(xid string) *shard {
-	fp := farm.Fingerprint32([]byte(xid))
-	idx := fp % uint32(len(m.shards))
-	return m.shards[idx]
+func (m *XidMap) shardFor(xid string) (*shard, uint64) {
+	fp := farm.Fingerprint64([]byte(xid))
+	idx := fp % uint64(len(m.shards))
+	return m.shards[idx], fp
 }
 
 // AssignUid creates new or looks up existing XID to UID mappings. It also returns if
 // UID was created.
 func (m *XidMap) AssignUid(xid string) (uint64, bool) {
-	sh := m.shardFor(xid)
+	sh, fp := m.shardFor(xid)
 	sh.RLock()
-	uid := sh.uidMap[xid]
+	uid := sh.uidMap[fp]
 	sh.RUnlock()
 	if uid > 0 {
 		return uid, false
@@ -161,13 +161,13 @@ func (m *XidMap) AssignUid(xid string) (uint64, bool) {
 	sh.Lock()
 	defer sh.Unlock()
 
-	uid = sh.uidMap[xid]
+	uid = sh.uidMap[fp]
 	if uid > 0 {
 		return uid, false
 	}
 
 	newUid := sh.assign(m.newRanges)
-	sh.uidMap[xid] = newUid
+	sh.uidMap[fp] = newUid
 
 	if m.writer != nil {
 		var uidBuf [8]byte
