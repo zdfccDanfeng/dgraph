@@ -888,9 +888,9 @@ func (n *node) Run() {
 			n.SaveToStorage(rd.HardState, rd.Entries, rd.Snapshot)
 			timer.Record("disk")
 			if rd.MustSync {
-				if err := n.Store.Sync(); err != nil {
-					glog.Errorf("Error while calling Store.Sync: %+v", err)
-				}
+				// if err := n.Store.Sync(); err != nil {
+				// 	glog.Errorf("Error while calling Store.Sync: %+v", err)
+				// }
 				timer.Record("sync")
 			}
 			if span != nil {
