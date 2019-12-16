@@ -193,7 +193,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 	startTs := proposal.Mutations.StartTs
 
 	if len(proposal.Mutations.Schema) > 0 || len(proposal.Mutations.Types) > 0 {
-		span.Annotatef(nil, "Applying schema and types")
+		span.Annotatef(nil, "[NodeID: %d] Applying schema and types", n.Id)
 		for _, supdate := range proposal.Mutations.Schema {
 			// We should not need to check for predicate move here.
 			if err := detectPendingTxns(supdate.Predicate); err != nil {
@@ -226,10 +226,10 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 			// We should only drop the predicate if there is no pending
 			// transaction.
 			if err := detectPendingTxns(edge.Attr); err != nil {
-				span.Annotatef(nil, "Found pending transactions. Retry later.")
+				span.Annotatef(nil, "[NodeID: %d] Found pending transactions. Retry later.", n.Id)
 				return err
 			}
-			span.Annotatef(nil, "Deleting predicate: %s", edge.Attr)
+			span.Annotatef(nil, "[NodeID: %d] Deleting predicate: %s", n.Id, edge.Attr)
 			return posting.DeletePredicate(ctx, edge.Attr)
 		}
 		// Dont derive schema when doing deletion.
@@ -265,7 +265,7 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 	m := proposal.Mutations
 	txn := posting.Oracle().RegisterStartTs(m.StartTs)
 	if txn.ShouldAbort() {
-		span.Annotatef(nil, "Txn %d should abort.", m.StartTs)
+		span.Annotatef(nil, "[NodeID: %d] Txn %d should abort.", n.Id, m.StartTs)
 		return zero.ErrConflict
 	}
 
@@ -306,7 +306,8 @@ func (n *node) applyMutations(ctx context.Context, proposal *pb.Proposal) (rerr 
 		return nil
 	}
 	numGo, width := x.DivideAndRule(len(m.Edges))
-	span.Annotatef(nil, "To apply: %d edges. NumGo: %d. Width: %d", len(m.Edges), numGo, width)
+	span.Annotatef(nil, "[NodeID: %d] To apply: %d edges. NumGo: %d. Width: %d",
+		n.Id, len(m.Edges), numGo, width)
 
 	if numGo == 1 {
 		return process(m.Edges)
@@ -340,10 +341,10 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		// syncmarks for this shouldn't be marked done until it's committed.
 		span.Annotate(nil, "Applying mutations")
 		if err := n.applyMutations(ctx, proposal); err != nil {
-			span.Annotatef(nil, "While applying mutations: %v", err)
+			span.Annotatef(nil, "[NodeID: %d] While applying mutations: %v", n.Id, err)
 			return err
 		}
-		span.Annotate(nil, "Done")
+		span.Annotatef(nil, "[NodeID: %d] Done", n.Id)
 		return nil
 	}
 
@@ -894,7 +895,8 @@ func (n *node) Run() {
 				timer.Record("sync")
 			}
 			if span != nil {
-				span.Annotatef(nil, "Saved %d entries. Snapshot, HardState empty? (%v, %v)",
+				span.Annotatef(nil, "[NodeID: %d] Saved %d entries. Snapshot, HardState empty? (%v, %v)",
+					n.Id,
 					len(rd.Entries),
 					raft.IsEmptySnap(rd.Snapshot),
 					raft.IsEmptyHardState(rd.HardState))
@@ -955,7 +957,8 @@ func (n *node) Run() {
 			}
 
 			if span != nil {
-				span.Annotatef(nil, "Handled %d committed entries.", len(rd.CommittedEntries))
+				span.Annotatef(nil, "[NodeID: %d] Handled %d committed entries.",
+					n.Id, len(rd.CommittedEntries))
 			}
 
 			if !leader {
@@ -1213,14 +1216,14 @@ func (n *node) calculateSnapshot(startIdx uint64, discardN int) (*pb.Snapshot, e
 
 	first, err := n.Store.FirstIndex()
 	if err != nil {
-		span.Annotatef(nil, "Error: %v", err)
+		span.Annotatef(nil, "[NodeID: %d] Error: %v", n.Id, err)
 		return nil, err
 	}
-	span.Annotatef(nil, "First index: %d", first)
+	span.Annotatef(nil, "[NodeID: %d] First index: %d", n.Id, first)
 	if startIdx > first {
 		// If we're starting from a higher index, set first to that.
 		first = startIdx
-		span.Annotatef(nil, "Setting first to: %d", startIdx)
+		span.Annotatef(nil, "[NodeID: %d] Setting first to: %d", n.Id, startIdx)
 	}
 
 	rsnap, err := n.Store.Snapshot()
@@ -1233,14 +1236,14 @@ func (n *node) calculateSnapshot(startIdx uint64, discardN int) (*pb.Snapshot, e
 			return nil, err
 		}
 	}
-	span.Annotatef(nil, "Last snapshot: %+v", snap)
+	span.Annotatef(nil, "[NodeID: %d] Last snapshot: %+v", n.Id, snap)
 
 	last := n.Applied.DoneUntil()
 	if int(last-first) < discardN {
 		span.Annotate(nil, "Skipping due to insufficient entries")
 		return nil, nil
 	}
-	span.Annotatef(nil, "Found Raft entries: %d", last-first)
+	span.Annotatef(nil, "[NodeID: %d] Found Raft entries: %d", n.Id, last-first)
 
 	if num := posting.Oracle().NumPendingTxns(); num > 0 {
 		glog.V(2).Infof("Num pending txns: %d", num)
@@ -1268,7 +1271,7 @@ func (n *node) calculateSnapshot(startIdx uint64, discardN int) (*pb.Snapshot, e
 	for batchFirst := first; batchFirst <= last; {
 		entries, err := n.Store.Entries(batchFirst, last+1, 64<<20)
 		if err != nil {
-			span.Annotatef(nil, "Error: %v", err)
+			span.Annotatef(nil, "[NodeID: %d] Error: %v", n.Id, err)
 			return nil, err
 		}
 
@@ -1289,7 +1292,7 @@ func (n *node) calculateSnapshot(startIdx uint64, discardN int) (*pb.Snapshot, e
 			}
 			var proposal pb.Proposal
 			if err := proposal.Unmarshal(entry.Data); err != nil {
-				span.Annotatef(nil, "Error: %v", err)
+				span.Annotatef(nil, "[NodeID: %d] Error: %v", n.Id, err)
 				return nil, err
 			}
 			if proposal.Mutations != nil {
@@ -1319,11 +1322,12 @@ func (n *node) calculateSnapshot(startIdx uint64, discardN int) (*pb.Snapshot, e
 
 	numDiscarding := snapshotIdx - first + 1
 	span.Annotatef(nil,
-		"Got snapshotIdx: %d. MaxCommitTs: %d. Discarding: %d. MinPendingStartTs: %d",
-		snapshotIdx, maxCommitTs, numDiscarding, minPendingStart)
+		"[NodeID: %d] Got snapshotIdx: %d. MaxCommitTs: %d. Discarding: %d. MinPendingStartTs: %d",
+		n.Id, snapshotIdx, maxCommitTs, numDiscarding, minPendingStart)
 
 	if int(numDiscarding) < discardN {
-		span.Annotate(nil, "Skipping snapshot because insufficient discard entries")
+		span.Annotatef(nil, "[NodeID: %d] Skipping snapshot because insufficient discard entries",
+			n.Id)
 		glog.Infof("Skipping snapshot at index: %d. Insufficient discard entries: %d."+
 			" MinPendingStartTs: %d\n", snapshotIdx, numDiscarding, minPendingStart)
 		return nil, nil
@@ -1334,7 +1338,7 @@ func (n *node) calculateSnapshot(startIdx uint64, discardN int) (*pb.Snapshot, e
 		Index:   snapshotIdx,
 		ReadTs:  maxCommitTs,
 	}
-	span.Annotatef(nil, "Got snapshot: %+v", result)
+	span.Annotatef(nil, "[NodeID: %d] Got snapshot: %+v", n.Id, result)
 	return result, nil
 }
 

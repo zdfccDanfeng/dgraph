@@ -193,7 +193,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 		x.AssertTruef(n.Proposals.Store(key, pctx), "Found existing proposal with key: [%v]", key)
 		defer n.Proposals.Delete(key) // Ensure that it gets deleted on return.
 
-		span.Annotatef(nil, "Proposing with key: %s. Timeout: %v", key, timeout)
+		span.Annotatef(nil, "[NodeID: %d] Proposing with key: %s. Timeout: %v", n.Id, key, timeout)
 		data, err := proposal.Marshal()
 		if err != nil {
 			return err
@@ -216,7 +216,8 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.Proposal) (perr 
 				if atomic.LoadUint32(&pctx.Found) > 0 {
 					// We found the proposal in CommittedEntries. No need to retry.
 				} else {
-					span.Annotatef(nil, "Timeout %s reached. Cancelling...", timeout)
+					span.Annotatef(nil, "[NodeID: %d] Timeout %s reached. Cancelling...",
+						n.Id, timeout)
 					cancel()
 				}
 			case <-cctx.Done():

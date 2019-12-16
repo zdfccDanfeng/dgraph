@@ -209,7 +209,7 @@ func (w *grpcWorker) MovePredicate(ctx context.Context,
 
 	err := movePredicateHelper(ctx, in)
 	if err != nil {
-		span.Annotatef(nil, "Error while movePredicateHelper: %v", err)
+		span.Annotatef(nil, "[NodeID: %d] Error while movePredicateHelper: %v", n.Id, err)
 	}
 	return &emptyPayload, err
 }

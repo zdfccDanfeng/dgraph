@@ -166,11 +166,11 @@ func (s *Server) AssignUids(ctx context.Context, num *pb.Num) (*pb.AssignedIds, 
 	lease := func() error {
 		var err error
 		if s.Node.AmLeader() {
-			span.Annotatef(nil, "Zero leader leasing %d ids", num.GetVal())
+			span.Annotatef(nil, "[NodeID: %d] Zero leader leasing %d ids", s.Node.Id, num.GetVal())
 			reply, err = s.lease(ctx, num, false)
 			return err
 		}
-		span.Annotate(nil, "Not Zero leader")
+		span.Annotatef(nil, "[NodeID: %d] Not Zero leader", s.Node.Id)
 		// I'm not the leader and this request was forwarded to me by a peer, who thought I'm the
 		// leader.
 		if num.Forwarded {
@@ -181,7 +181,7 @@ func (s *Server) AssignUids(ctx context.Context, num *pb.Num) (*pb.AssignedIds, 
 		if pl == nil {
 			return errors.Errorf("No healthy connection found to Leader of group zero")
 		}
-		span.Annotatef(nil, "Sending request to %v", pl.Addr)
+		span.Annotatef(nil, "[NodeID: %d] Sending request to %v", s.Node.Id, pl.Addr)
 		zc := pb.NewZeroClient(pl.Get())
 		num.Forwarded = true
 		reply, err = zc.AssignUids(ctx, num)
@@ -197,7 +197,7 @@ func (s *Server) AssignUids(ctx context.Context, num *pb.Num) (*pb.AssignedIds, 
 	case <-ctx.Done():
 		return reply, ctx.Err()
 	case err := <-c:
-		span.Annotatef(nil, "Error while leasing %+v: %v", num, err)
+		span.Annotatef(nil, "[NodeID: %d] Error while leasing %+v: %v", s.Node.Id, num, err)
 		return reply, err
 	}
 }

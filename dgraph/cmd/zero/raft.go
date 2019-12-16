@@ -117,7 +117,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) er
 		x.AssertTruef(n.Proposals.Store(key, pctx), "Found existing proposal with key: [%v]", key)
 		defer n.Proposals.Delete(key)
 		proposal.Key = key
-		span.Annotatef(nil, "Proposing with key: %s. Timeout: %v", key, timeout)
+		span.Annotatef(nil, "[NodeID: %d] Proposing with key: %s. Timeout: %v", n.Id, key, timeout)
 
 		data, err := proposal.Marshal()
 		if err != nil {
@@ -125,7 +125,7 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) er
 		}
 		// Propose the change.
 		if err := n.Raft().Propose(cctx, data); err != nil {
-			span.Annotatef(nil, "Error while proposing via Raft: %v", err)
+			span.Annotatef(nil, "[NodeID: %d] Error while proposing via Raft: %v", n.Id, err)
 			return errors.Wrapf(err, "While proposing")
 		}
 
@@ -135,7 +135,8 @@ func (n *node) proposeAndWait(ctx context.Context, proposal *pb.ZeroProposal) er
 			// We arrived here by a call to n.props.Done().
 			return err
 		case <-cctx.Done():
-			span.Annotatef(nil, "Internal context timeout %s. Will retry...", timeout)
+			span.Annotatef(nil, "[NodeID: %d] Internal context timeout %s. Will retry...",
+				n.Id, timeout)
 			return errInternalRetry
 		}
 	}
@@ -341,14 +342,14 @@ func (n *node) applyProposal(e raftpb.Entry) (string, error) {
 	}
 	if p.Member != nil {
 		if err := n.handleMemberProposal(p.Member); err != nil {
-			span.Annotatef(nil, "While applying membership proposal: %+v", err)
+			span.Annotatef(nil, "[NodeID: %d] While applying membership proposal: %+v", n.Id, err)
 			glog.Errorf("While applying membership proposal: %+v", err)
 			return p.Key, err
 		}
 	}
 	if p.Tablet != nil {
 		if err := n.handleTabletProposal(p.Tablet); err != nil {
-			span.Annotatef(nil, "While applying tablet proposal: %+v", err)
+			span.Annotatef(nil, "[NodeID: %d] While applying tablet proposal: %+v", n.Id, err)
 			glog.Errorf("While applying tablet proposal: %+v", err)
 			return p.Key, err
 		}
@@ -568,7 +569,7 @@ func (n *node) checkQuorum(closer *y.Closer) {
 			span.Annotate(nil, "Updated lastQuorum")
 
 		} else if glog.V(1) {
-			span.Annotatef(nil, "Got error: %v", err)
+			span.Annotatef(nil, "[NodeID: %d] Got error: %v", n.Id, err)
 			glog.Warningf("Zero node: %#x unable to reach quorum. Error: %v", n.Id, err)
 		}
 	}
@@ -656,7 +657,7 @@ func (n *node) Run() {
 				// empty.
 				readStateCh <- rs
 			}
-			span.Annotatef(nil, "Pushed %d readstates", len(rd.ReadStates))
+			span.Annotatef(nil, "[NodeID: %d] Pushed %d readstates", n.Id, len(rd.ReadStates))
 
 			if rd.SoftState != nil {
 				if rd.RaftState == raft.StateLeader && !leader {
@@ -682,7 +683,7 @@ func (n *node) Run() {
 				// }
 				timer.Record("sync")
 			}
-			span.Annotatef(nil, "Saved to storage")
+			span.Annotatef(nil, "[NodeID: %d] Saved to storage", n.Id)
 
 			if !raft.IsEmptySnap(rd.Snapshot) {
 				var state pb.MembershipState
@@ -709,7 +710,8 @@ func (n *node) Run() {
 				}
 				n.Applied.Done(entry.Index)
 			}
-			span.Annotatef(nil, "Applied %d CommittedEntries", len(rd.CommittedEntries))
+			span.Annotatef(nil, "[NodeID: %d] Applied %d CommittedEntries",
+				n.Id, len(rd.CommittedEntries))
 
 			if !leader {
 				// Followers should send messages later.

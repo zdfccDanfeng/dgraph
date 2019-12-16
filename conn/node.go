@@ -471,10 +471,10 @@ func (n *Node) doSendMessage(to uint64, msgCh chan []byte) error {
 			}
 			packets++
 			slurp(batch) // Pick up more entries from msgCh, if present.
-			span.Annotatef(nil, "[Packets: %d] Sending data of length: %d.",
-				packets, len(batch.Payload.Data))
+			span.Annotatef(nil, "[NodeID: %d] [Packets: %d] Sending data of length: %d.",
+				n.Id, packets, len(batch.Payload.Data))
 			if err := mc.Send(batch); err != nil {
-				span.Annotatef(nil, "Error while mc.Send: %v", err)
+				span.Annotatef(nil, "[NodeID: %d] Error while mc.Send: %v", n.Id, err)
 				switch {
 				case strings.Contains(err.Error(), "TransientFailure"):
 					glog.Warningf("Reporting node: %d addr: %s as unreachable.", to, pool.Addr)
@@ -489,7 +489,7 @@ func (n *Node) doSendMessage(to uint64, msgCh chan []byte) error {
 		case <-ticker.C:
 			if lastPackets == packets {
 				span.Annotatef(nil,
-					"No activity for a while [Packets == %d]. Closing connection.", packets)
+					"[NodeID: %d] No activity for a while [Packets == %d]. Closing connection.", n.Id, packets)
 				return mc.CloseSend()
 			}
 			lastPackets = packets

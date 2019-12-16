@@ -131,7 +131,7 @@ func (s *Server) movePredicate(predicate string, srcGroup, dstGroup uint32) erro
 		DestGid:   dstGroup,
 		TxnTs:     ids.StartId,
 	}
-	span.Annotatef(nil, "Starting move: %+v", in)
+	span.Annotatef(nil, "[NodeID: %d] Starting move: %+v", s.Node.Id, in)
 	glog.Infof("Starting move: %+v", in)
 	if _, err := wc.MovePredicate(ctx, in); err != nil {
 		return errors.Wrapf(err, "while calling MovePredicate")

@@ -575,7 +575,7 @@ func (s *Server) ShouldServe(
 
 	// Check who is serving this tablet.
 	tab := s.ServingTablet(tablet.Predicate)
-	span.Annotatef(nil, "Tablet for %s: %+v", tablet.Predicate, tab)
+	span.Annotatef(nil, "[NodeID: %d] Tablet for %s: %+v", s.Node.Id, tablet.Predicate, tab)
 	if tab != nil {
 		// Someone is serving this tablet. Could be the caller as well.
 		// The caller should compare the returned group against the group it holds to check who's
@@ -604,12 +604,13 @@ func (s *Server) ShouldServe(
 	}
 	proposal.Tablet = tablet
 	if err := s.Node.proposeAndWait(ctx, &proposal); err != nil && err != errTabletAlreadyServed {
-		span.Annotatef(nil, "While proposing tablet: %v", err)
+		span.Annotatef(nil, "[NodeID: %d] While proposing tablet: %v", s.Node.Id, err)
 		return tablet, err
 	}
 	tab = s.ServingTablet(tablet.Predicate)
 	x.AssertTrue(tab != nil)
-	span.Annotatef(nil, "Now serving tablet for %s: %+v", tablet.Predicate, tab)
+	span.Annotatef(nil, "[NodeID: %d] Now serving tablet for %s: %+v",
+		s.Node.Id, tablet.Predicate, tab)
 	return tab, nil
 }
 

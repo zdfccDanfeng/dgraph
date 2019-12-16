@@ -254,7 +254,7 @@ func (w *RaftServer) RaftMessage(server pb.Raft_RaftMessageServer) error {
 		}
 		if loop == 1 {
 			rc = batch.GetContext()
-			span.Annotatef(nil, "Stream from %#x", rc.GetId())
+			span.Annotatef(nil, "[NodeID: %d] Stream from %#x", node.Id, rc.GetId())
 			if rc != nil {
 				node.Connect(rc.Id, rc.Addr)
 			}
