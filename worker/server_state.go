@@ -17,24 +17,17 @@
 package worker
 
 import (
-	"io/ioutil"
 	"math"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/dgraph-io/badger/v2/options"
+	"github.com/dgraph-io/dgraph/ee/enc"
 	"github.com/dgraph-io/dgraph/protos/pb"
 	"github.com/dgraph-io/dgraph/x"
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
-)
-
-const (
-	groupFile = "group_id"
 )
 
 // ServerState holds the state of the Dgraph server.
@@ -65,19 +58,12 @@ func InitServerState() {
 	State.initStorage()
 	go State.fillTimestampRequests()
 
-	contents, err := ioutil.ReadFile(filepath.Join(Config.PostingDir, groupFile))
+	groupId, err := x.ReadGroupIdFile(Config.PostingDir)
 	if err != nil {
-		return
+		glog.Warningf("Could not read %s file inside posting directory %s.", x.GroupIdFileName,
+			Config.PostingDir)
 	}
-
-	glog.Infof("Found group_id file inside posting directory %s. Will attempt to read.",
-		Config.PostingDir)
-	groupId, err := strconv.ParseUint(strings.TrimSpace(string(contents)), 0, 32)
-	if err != nil {
-		glog.Warningf("Could not read %s file inside posting directory %s.",
-			groupFile, Config.PostingDir)
-	}
-	x.WorkerConfig.ProposedGroupId = uint32(groupId)
+	x.WorkerConfig.ProposedGroupId = groupId
 }
 
 func (s *ServerState) runVlogGC(store *badger.DB) {
@@ -109,7 +95,8 @@ func (s *ServerState) runVlogGC(store *badger.DB) {
 }
 
 func setBadgerOptions(opt badger.Options) badger.Options {
-	opt = opt.WithSyncWrites(false).WithTruncate(true).WithLogger(&x.ToGlog{})
+	opt = opt.WithSyncWrites(false).WithTruncate(true).WithLogger(&x.ToGlog{}).
+		WithEncryptionKey(enc.ReadEncryptionKeyFile(Config.BadgerKeyFile))
 
 	glog.Infof("Setting Badger table load option: %s", Config.BadgerTables)
 	switch Config.BadgerTables {
@@ -137,6 +124,18 @@ func setBadgerOptions(opt badger.Options) badger.Options {
 
 func (s *ServerState) initStorage() {
 	var err error
+
+	if Config.BadgerKeyFile != "" {
+		// non-nil key file
+		if !EnterpriseEnabled() {
+			// not licensed --> crash.
+			glog.Fatal("Valid Enterprise License needed for the Encryption feature.")
+		} else {
+			// licensed --> OK.
+			glog.Infof("Encryption feature enabled. Using encryption key file: %v", Config.BadgerKeyFile)
+		}
+	}
+
 	{
 		// Write Ahead Log directory
 		x.Checkf(os.MkdirAll(Config.WALDir, 0700), "Error while creating WAL dir.")
@@ -152,7 +151,13 @@ func (s *ServerState) initStorage() {
 		// storage provided by the Raft library.
 		opt.TableLoadingMode = options.LoadToRAM
 
+		// Print the options w/o exposing key.
+		// TODO: Build a stringify interface in Badger options, which is used to print nicely here.
+		key := opt.EncryptionKey
+		opt.EncryptionKey = nil
 		glog.Infof("Opening write-ahead log BadgerDB with options: %+v\n", opt)
+		opt.EncryptionKey = key
+
 		s.WALstore, err = badger.Open(opt)
 		x.Checkf(err, "Error while creating badger KV WAL store")
 	}
@@ -165,9 +170,18 @@ func (s *ServerState) initStorage() {
 			WithNumVersionsToKeep(math.MaxInt32).WithMaxCacheSize(1 << 30)
 		opt = setBadgerOptions(opt)
 
+		// Print the options w/o exposing key.
+		// TODO: Build a stringify interface in Badger options, which is used to print nicely here.
+		key := opt.EncryptionKey
+		opt.EncryptionKey = nil
 		glog.Infof("Opening postings BadgerDB with options: %+v\n", opt)
+		opt.EncryptionKey = key
+
 		s.Pstore, err = badger.OpenManaged(opt)
 		x.Checkf(err, "Error while creating badger KV posting store")
+
+		// zero out from memory
+		opt.EncryptionKey = nil
 	}
 
 	s.vlogTicker = time.NewTicker(1 * time.Minute)
