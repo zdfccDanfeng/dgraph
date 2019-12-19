@@ -28,6 +28,7 @@ import (
 	_ "net/http/pprof" // http profiler
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -317,7 +318,7 @@ func setupListener(addr string, port int) (net.Listener, error) {
 func serveGRPC(l net.Listener, tlsCfg *tls.Config, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	x.RegisterExporters(Alpha.Conf, "dgraph.alpha")
+	x.RegisterExporters(Alpha.Conf, "dgraph.alpha"+Alpha.Conf.GetString("idx"))
 
 	opt := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
@@ -382,6 +383,18 @@ func setupServer() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go func() {
+		mux := http.NewServeMux()
+		zpages.Handle(mux, "/debug")
+
+		// Change the address as needed
+		fmt.Println("Starting zpages on ", 9999+Alpha.Conf.GetInt("port_offset"))
+		zAddr := ":" + strconv.Itoa(9999+Alpha.Conf.GetInt("port_offset"))
+		if err := http.ListenAndServe(zAddr, mux); err != nil {
+			log.Fatalf("Failed to serve zPages")
+		}
+	}()
 
 	http.HandleFunc("/query", queryHandler)
 	http.HandleFunc("/query/", queryHandler)

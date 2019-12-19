@@ -27,3 +27,11 @@ scrape_configs:
     static_configs:
       - targets:
         - '10.191.30.249:2127'
+
+  - job_name: 'dgraph-bench'
+    scrape_interval: 500ms
+    scrape_timeout: 500ms
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+        - '10.191.30.249:3500'

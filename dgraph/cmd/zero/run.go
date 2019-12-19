@@ -110,7 +110,7 @@ type state struct {
 }
 
 func (st *state) serveGRPC(l net.Listener, store *raftwal.DiskStorage) {
-	x.RegisterExporters(Zero.Conf, "dgraph.zero")
+	x.RegisterExporters(Zero.Conf, "dgraph.zero"+Zero.Conf.GetString("idx"))
 
 	s := grpc.NewServer(
 		grpc.MaxRecvMsgSize(x.GrpcMaxSize),
@@ -203,8 +203,9 @@ func run() {
 
 	// Open raft write-ahead log and initialize raft node.
 	x.Checkf(os.MkdirAll(opts.w, 0700), "Error while creating WAL dir.")
-	kvOpt := badger.LSMOnlyOptions(opts.w).WithSyncWrites(false).WithTruncate(true).
+	kvOpt := badger.LSMOnlyOptions("").WithSyncWrites(false).WithTruncate(true).
 		WithValueLogFileSize(64 << 20).WithMaxCacheSize(10 << 20)
+	kvOpt.InMemory = true
 	kv, err := badger.Open(kvOpt)
 	x.Checkf(err, "Error while opening WAL store")
 	defer kv.Close()
@@ -218,6 +219,18 @@ func run() {
 	var st state
 	st.serveGRPC(grpcListener, store)
 	st.serveHTTP(httpListener)
+
+	go func() {
+		mux := http.NewServeMux()
+		zpages.Handle(mux, "/debug")
+
+		// Change the address as needed
+		zAddr := ":8888"
+		fmt.Println("Starting zpages on 8888")
+		if err := http.ListenAndServe(zAddr, mux); err != nil {
+			log.Fatalf("Failed to serve zPages")
+		}
+	}()
 
 	http.HandleFunc("/state", st.getState)
 	http.HandleFunc("/removeNode", st.removeNode)

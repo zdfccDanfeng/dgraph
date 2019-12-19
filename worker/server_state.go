@@ -139,10 +139,12 @@ func (s *ServerState) initStorage() {
 	{
 		// Write Ahead Log directory
 		x.Checkf(os.MkdirAll(Config.WALDir, 0700), "Error while creating WAL dir.")
-		opt := badger.LSMOnlyOptions(Config.WALDir)
+		opt := badger.LSMOnlyOptions("")
 		opt = setBadgerOptions(opt)
 		opt.ValueLogMaxEntries = 10000 // Allow for easy space reclamation.
 		opt.MaxCacheSize = 10 << 20    // 10 mb of cache size for WAL.
+		opt.InMemory = true
+		opt.NumLevelZeroTablesStall = 30
 
 		// We should always force load LSM tables to memory, disregarding user settings, because
 		// Raft.Advance hits the WAL many times. If the tables are not in memory, retrieval slows
@@ -166,9 +168,11 @@ func (s *ServerState) initStorage() {
 		// All the writes to posting store should be synchronous. We use batched writers
 		// for posting lists, so the cost of sync writes is amortized.
 		x.Check(os.MkdirAll(Config.PostingDir, 0700))
-		opt := badger.DefaultOptions(Config.PostingDir).WithValueThreshold(1 << 10 /* 1KB */).
-			WithNumVersionsToKeep(math.MaxInt32).WithMaxCacheSize(1 << 30)
+		opt := badger.DefaultOptions("").WithValueThreshold(1 << 10 /* 1KB */).
+			WithNumVersionsToKeep(math.MaxInt32).WithMaxCacheSize(1 << 30).WithInmemory(true)
 		opt = setBadgerOptions(opt)
+		opt.InMemory = true
+		opt.NumLevelZeroTablesStall = 30
 
 		// Print the options w/o exposing key.
 		// TODO: Build a stringify interface in Badger options, which is used to print nicely here.
