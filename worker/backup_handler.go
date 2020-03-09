@@ -195,9 +195,9 @@ func LoadBackup(location, backupId string, fn loadFn) LoadResult {
 	return h.Load(uri, backupId, fn)
 }
 
-// Verify will access the backup location and verify that the specified backup can
+// VerifyBackup will access the backup location and verify that the specified backup can
 // be restored to the cluster.
-func Verify(location, backupId string, creds *Credentials, currentGroups []uint32) error {
+func VerifyBackup(location, backupId string, creds *Credentials, currentGroups []uint32) error {
 	uri, err := url.Parse(location)
 	if err != nil {
 		return err
