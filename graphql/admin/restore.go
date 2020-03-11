@@ -52,7 +52,7 @@ func (rr *restoreResolver) Rewrite(
 		return nil, nil, err
 	}
 
-	req := pb.Restore{
+	req := pb.RestoreRequest{
 		Location:     input.Location,
 		AccessKey:    input.AccessKey,
 		SecretKey:    input.SecretKey,

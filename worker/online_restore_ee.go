@@ -22,7 +22,7 @@ import (
 )
 
 // ProcessRestoreRequest verifies the backup data and sends a restore proposal to each group.
-func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreProposal) error {
+func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest) error {
 	if req == nil {
 		return errors.Errorf("restore request cannot be nil")
 	}
@@ -52,15 +52,20 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreProposal) error {
 
 	cancelCtx, cancel := context.WithCancel(ctx)
 	for _, gid := range currentGroups {
-
+		// TODO: copy req
+		if err := proposeRestoreOrSend(cancelCtx, gid, req); err != nil {
+			cancel()
+			return err
+		}
 	}
 
 	return nil
 }
 
-func proposeRestoreOrSend(ctx context.Context, gid uint32, req *pb.Restore) error {
+func proposeRestoreOrSend(ctx context.Context, gid uint32, req *pb.RestoreRequest) error {
 	if groups().ServesGroup(gid) {
-		return (&grpcWorker{}).Restore(ctx, req)
+		_, err := (&grpcWorker{}).Restore(ctx, req)
+		return err
 	}
 
 	pl := groups().Leader(gid)
@@ -70,26 +75,11 @@ func proposeRestoreOrSend(ctx context.Context, gid uint32, req *pb.Restore) erro
 	con := pl.Get()
 	c := pb.NewWorkerClient(con)
 
-	c.Restore()
-	ch := make(chan error, 1)
-	go func() {
-		var err error
-		tc, err = c.Mutate(ctx, m)
-		ch <- err
-	}()
-
-	select {
-	case <-ctx.Done():
-		res.err = ctx.Err()
-		res.ctx = nil
-	case err := <-ch:
-		res.err = err
-		res.ctx = tc
-	}
-	chr <- res
+	_, err := c.Restore(ctx, req)
+	return err
 }
 
 // Restore implements the Worker interface.
-func (w *grpcWorker) Restore(ctx context.Context, req *pb.Restore) error {
-	return nil
+func (w *grpcWorker) Restore(ctx context.Context, req *pb.RestoreRequest) (*pb.Status, error) {
+	return nil, nil
 }

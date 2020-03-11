@@ -27,12 +27,12 @@ import (
 )
 
 // Restore implements the Worker interface.
-func (w *grpcWorker) Restore(ctx context.Context, req *pb.Restore) (*pb.Status, error) {
+func (w *grpcWorker) Restore(ctx context.Context, req *pb.RestoreRequest) (*pb.Status, error) {
 	glog.Warningf("Restore failed: %v", x.ErrNotSupported)
 	return nil, x.ErrNotSupported
 }
 
-func ProcessRestoreRequest(ctx context.Context, req *pb.Restore) error {
+func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest) error {
 	glog.Warningf("Restore failed: %v", x.ErrNotSupported)
 	return x.ErrNotSupported
 }

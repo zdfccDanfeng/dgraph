@@ -47,7 +47,7 @@ const (
 
 // FillRestoreCredentials fills the empty values with the default credentials so that
 // a restore request is sent to all the groups with the same credentials.
-func FillRestoreCredentials(location string, req *pb.Restore) error {
+func FillRestoreCredentials(location string, req *pb.RestoreRequest) error {
 	uri, err := url.Parse(location)
 	if err != nil {
 		return err
