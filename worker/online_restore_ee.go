@@ -18,6 +18,7 @@ import (
 	"github.com/dgraph-io/dgraph/conn"
 	"github.com/dgraph-io/dgraph/protos/pb"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 )
 
@@ -52,7 +53,8 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest) error {
 
 	cancelCtx, cancel := context.WithCancel(ctx)
 	for _, gid := range currentGroups {
-		// TODO: copy req
+		reqCopy := proto.Clone(req).(*pb.RestoreRequest)
+		reqCopy.GroupId = gid
 		if err := proposeRestoreOrSend(cancelCtx, gid, req); err != nil {
 			cancel()
 			return err
