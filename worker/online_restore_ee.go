@@ -55,7 +55,7 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest) error {
 	for _, gid := range currentGroups {
 		reqCopy := proto.Clone(req).(*pb.RestoreRequest)
 		reqCopy.GroupId = gid
-		if err := proposeRestoreOrSend(cancelCtx, gid, req); err != nil {
+		if err := proposeRestoreOrSend(cancelCtx, req); err != nil {
 			cancel()
 			return err
 		}
@@ -64,13 +64,13 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreRequest) error {
 	return nil
 }
 
-func proposeRestoreOrSend(ctx context.Context, gid uint32, req *pb.RestoreRequest) error {
-	if groups().ServesGroup(gid) {
+func proposeRestoreOrSend(ctx context.Context, req *pb.RestoreRequest) error {
+	if groups().ServesGroup(req.GetGroupId()) {
 		_, err := (&grpcWorker{}).Restore(ctx, req)
 		return err
 	}
 
-	pl := groups().Leader(gid)
+	pl := groups().Leader(req.GetGroupId())
 	if pl == nil {
 		return conn.ErrNoConnection
 	}
