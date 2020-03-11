@@ -15,13 +15,14 @@ package worker
 import (
 	"context"
 
+	"github.com/dgraph-io/dgraph/conn"
 	"github.com/dgraph-io/dgraph/protos/pb"
 
 	"github.com/pkg/errors"
 )
 
 // ProcessRestoreRequest verifies the backup data and sends a restore proposal to each group.
-func ProcessRestoreRequest(ctx context.Context, req *pb.Restore) error {
+func ProcessRestoreRequest(ctx context.Context, req *pb.RestoreProposal) error {
 	if req == nil {
 		return errors.Errorf("restore request cannot be nil")
 	}
@@ -49,14 +50,46 @@ func ProcessRestoreRequest(ctx context.Context, req *pb.Restore) error {
 	}
 	req.RestoreTs = State.GetTimestamp(false)
 
-	// for _, gid := range currentGroups {
+	cancelCtx, cancel := context.WithCancel(ctx)
+	for _, gid := range currentGroups {
 
-	// }
+	}
 
 	return nil
 }
 
+func proposeRestoreOrSend(ctx context.Context, gid uint32, req *pb.Restore) error {
+	if groups().ServesGroup(gid) {
+		return (&grpcWorker{}).Restore(ctx, req)
+	}
+
+	pl := groups().Leader(gid)
+	if pl == nil {
+		return conn.ErrNoConnection
+	}
+	con := pl.Get()
+	c := pb.NewWorkerClient(con)
+
+	c.Restore()
+	ch := make(chan error, 1)
+	go func() {
+		var err error
+		tc, err = c.Mutate(ctx, m)
+		ch <- err
+	}()
+
+	select {
+	case <-ctx.Done():
+		res.err = ctx.Err()
+		res.ctx = nil
+	case err := <-ch:
+		res.err = err
+		res.ctx = tc
+	}
+	chr <- res
+}
+
 // Restore implements the Worker interface.
-func (w *grpcWorker) Restore(ctx context.Context, req *pb.Restore) (*pb.Status, error) {
-	return nil, nil
+func (w *grpcWorker) Restore(ctx context.Context, req *pb.Restore) error {
+	return nil
 }
