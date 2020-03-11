@@ -16,6 +16,7 @@ import (
 	"context"
 
 	"github.com/dgraph-io/dgraph/conn"
+	"github.com/dgraph-io/dgraph/posting"
 	"github.com/dgraph-io/dgraph/protos/pb"
 
 	"github.com/golang/protobuf/proto"
@@ -83,5 +84,23 @@ func proposeRestoreOrSend(ctx context.Context, req *pb.RestoreRequest) error {
 
 // Restore implements the Worker interface.
 func (w *grpcWorker) Restore(ctx context.Context, req *pb.RestoreRequest) (*pb.Status, error) {
-	return nil, nil
+	var emptyRes pb.Status
+	// TODO: add tracing to backup and restore operations.
+
+	if !groups().ServesGroup(req.GroupId) {
+		return &emptyRes, errors.Errorf("this server doesn't serve group id: %v", req.GroupId)
+	}
+
+	// We should wait to ensure that we have seen all the updates until the StartTs
+	// of this restore transaction.
+	if err := posting.Oracle().WaitForTs(ctx, req.RestoreTs); err != nil {
+		return nil, errors.Wrapf(err, "cannot wait for restore ts %d", req.RestoreTs)
+	}
+
+	err := groups().Node.proposeAndWait(ctx, &pb.Proposal{Restore: req})
+	if err != nil {
+		return &emptyRes, errors.Wrapf(err, "cannot propose restore request")
+	}
+
+	return &emptyRes, nil
 }
