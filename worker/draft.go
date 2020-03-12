@@ -432,6 +432,9 @@ func (n *node) applyCommitted(proposal *pb.Proposal) error {
 		// Roll up all posting lists as a best-effort operation.
 		n.rollupCh <- snap.ReadTs
 		return nil
+
+	case proposal.Restore != nil:
+		return handleRestoreProposal(ctx, proposal.Restore)
 	}
 	x.Fatalf("Unknown proposal: %+v", proposal)
 	return nil

@@ -104,3 +104,25 @@ func (w *grpcWorker) Restore(ctx context.Context, req *pb.RestoreRequest) (*pb.S
 
 	return &emptyRes, nil
 }
+
+func handleRestoreProposal(ctx context.Context, req *pb.RestoreRequest) error {
+	// Drop all the current data. This also cancels all existing transactions.
+	dropProposal := pb.Proposal{
+		Mutations: &pb.Mutations{
+			GroupId: req.GroupId,
+			StartTs: req.RestoreTs,
+			DropOp: pb.Mutations_ALL,
+		},
+	}
+	groups().Node.applyMutations(ctx, &dropProposal)
+
+	// Reset tablets and set correct tablets to match the restored backup.
+
+	// stream database
+
+	// update timestamp.
+
+	// perform snapshot.
+
+	return nil
+}
